@@ -127,7 +127,7 @@ async function processVerifications() {
         
         // Canal de logs (usamos el logChannel configurado en /set)
         const logChannelId = serversData[guildId]?.logChannel;
-        const logChannel = "1471282267811741808";
+        const logChannel = guild?.channels.cache.get(1471282267811741808);
 
         for (const doc of snapshot.docs) {
             const userData = doc.data();

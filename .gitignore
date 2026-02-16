@@ -1,5 +1,0 @@
-node_modules/
-.env
-Data/servers.json
-Data/verify.json
-firebase-admin-key.json

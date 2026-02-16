@@ -111,30 +111,56 @@ client.on('interactionCreate', async interaction => {
 async function processVerifications() {
     try {
         const usersRef = db.collection('ServerUsers');
-        // Filtramos SOLO por status, esto no requiere índice compuesto
         const snapshot = await usersRef.where('status', '==', 'verified').get();
 
         if (snapshot.empty) return;
 
+        // Cargar configuraciones
         const verifyConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'Data', 'verify.json'), 'utf8'));
-        const guild = client.guilds.cache.get('1468322673087217887'); 
+        const serversData = fs.existsSync(path.join(__dirname, 'Data', 'servers.json')) 
+            ? JSON.parse(fs.readFileSync(path.join(__dirname, 'Data', 'servers.json'), 'utf8')) 
+            : {};
+
+        const guildId = '1468322673087217887';
+        const guild = client.guilds.cache.get(guildId); 
         const role = guild?.roles.cache.get(verifyConfig.verifiedRole);
+        
+        // Canal de logs (usamos el logChannel configurado en /set)
+        const logChannelId = serversData[guildId]?.logChannel;
+        const logChannel = "1471282267811741808";
 
         for (const doc of snapshot.docs) {
             const userData = doc.data();
 
-            // Filtramos manualmente en el código en lugar de la consulta
             if (userData.roleGived === true) continue; 
 
             const member = await guild.members.fetch(userData.discordId).catch(() => null);
 
             if (member) {
                 await member.roles.add(role);
+                
+                // Actualizar Firebase
                 await doc.ref.update({
                     roleGived: true,
                     roleGivedAt: admin.firestore.FieldValue.serverTimestamp()
                 });
+
                 console.log(` ✅ Rol otorgado a: ${member.user.tag}`);
+
+                // --- ENVIAR LOG DE VERIFICACIÓN ---
+                if (logChannel) {
+                    const logEmbed = new EmbedBuilder()
+                        .setColor('#8b5cf6')
+                        .setTitle('🛡️ Nueva Verificación Completada')
+                        .addFields(
+                            { name: '👤 Usuario', value: `${member.user.tag}`, inline: true },
+                            { name: '🆔 Discord ID', value: `\`${userData.discordId}\``, inline: true },
+                            { name: '🌐 Dirección IP', value: `||${userData.ip || 'No registrada'}||`, inline: true }
+                        )
+                        .setTimestamp();
+
+                    await logChannel.send({ embeds: [logEmbed] });
+                }
             }
         }
     } catch (error) {
